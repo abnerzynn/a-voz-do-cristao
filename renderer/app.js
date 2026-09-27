@@ -849,6 +849,35 @@ function renderConfig() {
         </div>
         <div class="muted" id="dataPath" style="font-size:11.5px;margin-top:14px"></div>
       </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <div style="font-weight:600;margin-bottom:4px">Sincronização na nuvem</div>
+        <div class="muted" style="font-size:12.5px;margin-bottom:10px">
+          Compartilha a mesma biblioteca de mensagens entre vários computadores.
+          O aplicativo continua funcionando normalmente sem internet.
+        </div>
+        <div class="config-row">
+          <div class="cl">Ativar sincronização<small>Sincroniza ao abrir o aplicativo</small></div>
+          <label class="switch"><input type="checkbox" id="cSyncOn" ${s.cloudEnabled?'checked':''}><span class="track"></span></label>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Endereço do projeto (URL)</label>
+          <input class="input" id="cSyncUrl" placeholder="https://xxxxxxxx.supabase.co" value="${esc(s.cloudUrl||'')}">
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Chave pública (anon key)</label>
+          <input class="input" id="cSyncKey" type="password" placeholder="cole aqui a chave anon/public" value="${esc(s.cloudKey||'')}">
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>Chave da igreja<small style="color:var(--cinza-txt)"> — a mesma em todos os computadores</small></label>
+          <input class="input" id="cSyncWs" placeholder="ex.: tabernaculo-a-voz-do-cristao" value="${esc(s.cloudWorkspace||'')}">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
+          <button class="btn" id="cSyncTest">🔌 Testar conexão</button>
+          <button class="btn btn-primary" id="cSyncNow">🔄 Sincronizar agora</button>
+          <span class="muted" id="cSyncStatus" style="font-size:12.5px"></span>
+        </div>
+      </div>
     </div>
   `;
 
@@ -973,6 +1002,42 @@ function renderConfig() {
     applyTheme();
     toast('Todos os dados foram apagados.');
     renderConfig();
+  };
+
+  // ----- Sincronização na nuvem -----
+  const syncStatus = $('#cSyncStatus');
+  const semBarraFinal = (u) => { while (u.endsWith('/')) u = u.slice(0, -1); return u; };
+  const cloudCfg = () => ({
+    url: semBarraFinal($('#cSyncUrl').value.trim()),
+    key: $('#cSyncKey').value.trim(),
+    workspace: $('#cSyncWs').value.trim()
+  });
+  const salvarCloud = () => {
+    const c = cloudCfg();
+    commit({ cloudUrl: c.url, cloudKey: c.key, cloudWorkspace: c.workspace });
+  };
+  $('#cSyncUrl').onchange = salvarCloud;
+  $('#cSyncKey').onchange = salvarCloud;
+  $('#cSyncWs').onchange = salvarCloud;
+  $('#cSyncOn').onchange = (e) => commit({ cloudEnabled: e.target.checked });
+
+  $('#cSyncTest').onclick = async () => {
+    salvarCloud();
+    syncStatus.textContent = 'Testando…';
+    const r = await window.api.cloud.test(cloudCfg());
+    if (r.ok) { syncStatus.textContent = '✅ Conexão funcionando.'; toast('Conexão com a nuvem funcionando.', 'ok'); }
+    else { syncStatus.textContent = '❌ ' + r.error; toast(r.error, 'err'); }
+  };
+
+  $('#cSyncNow').onclick = async () => {
+    salvarCloud();
+    syncStatus.textContent = 'Sincronizando…';
+    const r = await window.api.cloud.sync();
+    if (!r.ok) { syncStatus.textContent = '❌ ' + r.error; toast(r.error, 'err'); return; }
+    const b = r.baixadas || {};
+    syncStatus.textContent = `✅ ${b.added||0} nova(s), ${b.updated||0} atualizada(s), ${b.removed||0} removida(s) · ${r.enviadas||0} enviada(s)`;
+    await reloadMessages();
+    toast('Sincronização concluída.', 'ok');
   };
 
   window.api.app.info().then(info => {

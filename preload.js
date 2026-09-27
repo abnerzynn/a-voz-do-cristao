@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld('api', {
     import: () => ipcRenderer.invoke('backup:import'),
     wipe: () => ipcRenderer.invoke('backup:wipe')
   },
+  cloud: {
+    config: () => ipcRenderer.invoke('cloud:config'),
+    test: (cfg) => ipcRenderer.invoke('cloud:test', cfg),
+    sync: () => ipcRenderer.invoke('cloud:sync'),
+    onSynced: (cb) => ipcRenderer.on('cloud:synced', (_e, r) => cb(r))
+  },
   app: {
     info: () => ipcRenderer.invoke('app:info')
   }

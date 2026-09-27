@@ -28,11 +28,17 @@ const DEFAULT_SETTINGS = {
   showParagraphNumber: true,
   showTitleDate: true,
   background: '#000000',
-  textColor: '#ffffff'
+  textColor: '#ffffff',
+  // Sincronização na nuvem (opcional)
+  cloudEnabled: false,
+  cloudUrl: '',
+  cloudKey: '',
+  cloudWorkspace: '',
+  lastSyncAt: ''
 };
 
 let dataFile = null;
-let db = { settings: { ...DEFAULT_SETTINGS }, messages: [] };
+let db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [] };
 
 function uid() {
   return crypto.randomBytes(8).toString('hex');
@@ -44,7 +50,8 @@ function load() {
       const parsed = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
       db = {
         settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
-        messages: Array.isArray(parsed.messages) ? parsed.messages : []
+        messages: Array.isArray(parsed.messages) ? parsed.messages : [],
+        deleted: Array.isArray(parsed.deleted) ? parsed.deleted : []
       };
     }
   } catch (err) {
@@ -54,7 +61,7 @@ function load() {
         fs.copyFileSync(dataFile, dataFile + '.corrupted-' + Date.now());
       }
     } catch (_) { /* ignore */ }
-    db = { settings: { ...DEFAULT_SETTINGS }, messages: [] };
+    db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [] };
   }
 }
 
@@ -196,6 +203,11 @@ function updateMessage(id, data) {
 function deleteMessage(id) {
   const before = db.messages.length;
   db.messages = db.messages.filter(x => x.id !== id);
+  if (db.messages.length < before) {
+    // Registra a exclusão para que ela também ocorra nos outros computadores.
+    db.deleted = (db.deleted || []).filter(t => t.id !== id);
+    db.deleted.push({ id, deletedAt: new Date().toISOString() });
+  }
   save();
   return db.messages.length < before;
 }
@@ -374,11 +386,86 @@ function stats() {
   };
 }
 
+
+// ---------- Sincronização na nuvem ----------
+
+/** Dados de conexão guardados nas configurações. */
+function getCloudConfig() {
+  return {
+    url: db.settings.cloudUrl || '',
+    key: db.settings.cloudKey || '',
+    workspace: db.settings.cloudWorkspace || '',
+    enabled: !!db.settings.cloudEnabled,
+    lastSyncAt: db.settings.lastSyncAt || ''
+  };
+}
+
+function setLastSync(iso) {
+  db.settings.lastSyncAt = iso;
+  save();
+  return iso;
+}
+
+/** O que mudou localmente desde a última sincronização. */
+function getLocalChanges(sinceISO) {
+  const since = sinceISO ? Date.parse(sinceISO) : 0;
+  const messages = db.messages.filter(m => !since || Date.parse(m.updatedAt || 0) > since);
+  const tombstones = (db.deleted || []).filter(t => !since || Date.parse(t.deletedAt || 0) > since);
+  return { messages, tombstones };
+}
+
+/**
+ * Aplica no banco local as linhas vindas da nuvem.
+ * Vence sempre a versão mais recente (comparando a data de alteração).
+ */
+function applyRemote(rows, limit) {
+  let added = 0, updated = 0, removed = 0;
+  for (const r of rows || []) {
+    const idx = db.messages.findIndex(m => m.id === r.id);
+    const local = idx >= 0 ? db.messages[idx] : null;
+
+    if (r.deleted) {
+      if (local) {
+        db.messages.splice(idx, 1);
+        removed++;
+        db.deleted = (db.deleted || []).filter(t => t.id !== r.id);
+        db.deleted.push({ id: r.id, deletedAt: r.updatedAt || new Date().toISOString() });
+      }
+      continue;
+    }
+
+    // Ignora se o que está aqui é mais novo que o da nuvem.
+    if (local && Date.parse(local.updatedAt || 0) >= Date.parse(r.updatedAt || 0)) continue;
+
+    const m = {
+      id: r.id,
+      title: r.title || 'Sem título',
+      day: r.day == null ? null : Number(r.day),
+      month: r.month == null ? null : Number(r.month),
+      year: r.year == null ? null : Number(r.year),
+      translation: r.translation || '',
+      originalText: r.originalText || '',
+      createdAt: r.createdAt || new Date().toISOString(),
+      updatedAt: r.updatedAt || new Date().toISOString(),
+      paragraphs: [],
+      slides: []
+    };
+    // Cada computador recalcula parágrafos e slides com o seu próprio limite.
+    rebuild(m, limit || db.settings.charLimit);
+
+    if (local) { db.messages[idx] = m; updated++; }
+    else { db.messages.push(m); added++; }
+  }
+  if (added || updated || removed) save();
+  return { added, updated, removed };
+}
+
 module.exports = {
   init, MONTHS, TRANSLATIONS, DEFAULT_SETTINGS,
   getSettings, saveSettings,
   listMessages, getMessage, createMessage, updateMessage, deleteMessage,
   duplicateMessage, rebuildAll, preview,
   searchByTitleParagraph, searchFullText,
-  exportBackup, importBackup, wipeAll, stats, dateLabel
+  exportBackup, importBackup, wipeAll, stats, dateLabel,
+  getCloudConfig, setLastSync, getLocalChanges, applyRemote
 };

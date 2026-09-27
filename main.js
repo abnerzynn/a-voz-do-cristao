@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, screen, dialog, globalShortcut } = require(
 const path = require('path');
 const db = require('./src/db');
 const server = require('./src/server');
+const cloud = require('./src/cloud');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -177,6 +178,14 @@ function registerIpc() {
   });
   ipcMain.handle('backup:wipe', () => db.wipeAll());
 
+  // Sincronização na nuvem
+  ipcMain.handle('cloud:config', () => db.getCloudConfig());
+  ipcMain.handle('cloud:test', async (_e, cfg) => {
+    try { await cloud.test(cfg); return { ok: true }; }
+    catch (err) { return { ok: false, error: String(err.message || err) }; }
+  });
+  ipcMain.handle('cloud:sync', async () => doSync());
+
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     dataFile: path.join(app.getPath('userData'), 'avoz-database.json')
@@ -207,11 +216,46 @@ function setupAutoUpdate() {
   autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 }
 
+
+// ---------- Sincronização na nuvem ----------
+async function doSync() {
+  const cfg = db.getCloudConfig();
+  if (!cloud.configured(cfg)) {
+    return { ok: false, error: 'Configure o endereço, a chave e a chave da igreja.' };
+  }
+  try {
+    const since = cfg.lastSyncAt || '';
+    // 1) Traz o que mudou na nuvem e aplica aqui.
+    const rows = await cloud.pull(cfg, since);
+    const aplicado = db.applyRemote(rows, db.getSettings().charLimit);
+    // 2) Envia o que mudou aqui.
+    const { messages, tombstones } = db.getLocalChanges(since);
+    const enviadas = await cloud.push(cfg, messages, tombstones);
+    // 3) Guarda a data, com folga de 5 minutos para tolerar relógios diferentes.
+    const marca = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    db.setLastSync(marca);
+    return { ok: true, baixadas: aplicado, enviadas, at: new Date().toISOString() };
+  } catch (err) {
+    return { ok: false, error: String(err.message || err) };
+  }
+}
+
+// Sincroniza sozinho ao abrir, se estiver configurado (sem incomodar em caso de falha).
+async function syncOnStart() {
+  const cfg = db.getCloudConfig();
+  if (!cfg.enabled || !cloud.configured(cfg)) return;
+  const r = await doSync();
+  if (r.ok && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('cloud:synced', r);
+  }
+}
+
 app.whenReady().then(() => {
   db.init(app.getPath('userData'));
   registerIpc();
   createMainWindow();
   setupAutoUpdate();
+  syncOnStart();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
