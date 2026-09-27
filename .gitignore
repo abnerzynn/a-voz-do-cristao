@@ -4,3 +4,6 @@ dist/
 .DS_Store
 Thumbs.db
 .claude/
+src/cloud-defaults.js
+tools/importacao.json
+tools/importar-amensagem.js

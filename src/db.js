@@ -30,7 +30,7 @@ const DEFAULT_SETTINGS = {
   background: '#000000',
   textColor: '#ffffff',
   // Sincronização na nuvem (opcional)
-  cloudEnabled: false,
+  cloudEnabled: true,   // vem ligado quando há credenciais embutidas
   cloudUrl: '',
   cloudKey: '',
   cloudWorkspace: '',
@@ -389,14 +389,22 @@ function stats() {
 
 // ---------- Sincronização na nuvem ----------
 
-/** Dados de conexão guardados nas configurações. */
+// Credenciais embutidas (arquivo fora do repositório). Se existirem, o
+// aplicativo já vem conectado à nuvem da igreja, sem precisar digitar nada.
+let PADROES_NUVEM = { url: '', key: '', workspace: '' };
+try {
+  PADROES_NUVEM = { ...PADROES_NUVEM, ...require('./cloud-defaults') };
+} catch (_) { /* build sem credenciais embutidas */ }
+
+/** Dados de conexão: o que o usuário configurou ou, na falta, o embutido. */
 function getCloudConfig() {
   return {
-    url: db.settings.cloudUrl || '',
-    key: db.settings.cloudKey || '',
-    workspace: db.settings.cloudWorkspace || '',
+    url: db.settings.cloudUrl || PADROES_NUVEM.url || '',
+    key: db.settings.cloudKey || PADROES_NUVEM.key || '',
+    workspace: db.settings.cloudWorkspace || PADROES_NUVEM.workspace || '',
     enabled: !!db.settings.cloudEnabled,
-    lastSyncAt: db.settings.lastSyncAt || ''
+    lastSyncAt: db.settings.lastSyncAt || '',
+    embutido: !db.settings.cloudUrl && !!PADROES_NUVEM.url
   };
 }
 
@@ -418,14 +426,24 @@ function getLocalChanges(sinceISO) {
  * Aplica no banco local as linhas vindas da nuvem.
  * Vence sempre a versão mais recente (comparando a data de alteração).
  */
-function applyRemote(rows, limit) {
+function applyRemote(rows, limit, opcoes) {
   let added = 0, updated = 0, removed = 0;
+
+  // Trava de segurança: uma sincronização nunca deve apagar a biblioteca
+  // inteira. Se chegarem muitas exclusões de uma vez, elas são recusadas e o
+  // usuário é avisado — as mensagens continuam aqui e na cópia local.
+  const permitirMuitas = !!(opcoes && opcoes.permitirExclusoesEmMassa);
+  const pedidasParaExcluir = (rows || []).filter(
+    r => r.deleted && db.messages.some(m => m.id === r.id)
+  ).length;
+  const limiteExclusoes = Math.max(10, Math.ceil(db.messages.length * 0.25));
+  const bloquearExclusoes = !permitirMuitas && pedidasParaExcluir > limiteExclusoes;
   for (const r of rows || []) {
     const idx = db.messages.findIndex(m => m.id === r.id);
     const local = idx >= 0 ? db.messages[idx] : null;
 
     if (r.deleted) {
-      if (local) {
+      if (local && !bloquearExclusoes) {
         db.messages.splice(idx, 1);
         removed++;
         db.deleted = (db.deleted || []).filter(t => t.id !== r.id);
@@ -457,7 +475,10 @@ function applyRemote(rows, limit) {
     else { db.messages.push(m); added++; }
   }
   if (added || updated || removed) save();
-  return { added, updated, removed };
+  return {
+    added, updated, removed,
+    exclusoesBloqueadas: bloquearExclusoes ? pedidasParaExcluir : 0
+  };
 }
 
 module.exports = {

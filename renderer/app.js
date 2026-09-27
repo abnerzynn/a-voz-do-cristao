@@ -1035,7 +1035,12 @@ function renderConfig() {
     const r = await window.api.cloud.sync();
     if (!r.ok) { syncStatus.textContent = '❌ ' + r.error; toast(r.error, 'err'); return; }
     const b = r.baixadas || {};
-    syncStatus.textContent = `✅ ${b.added||0} nova(s), ${b.updated||0} atualizada(s), ${b.removed||0} removida(s) · ${r.enviadas||0} enviada(s)`;
+    let resumo = `✅ ${b.added||0} nova(s), ${b.updated||0} atualizada(s), ${b.removed||0} removida(s) · ${r.enviadas||0} enviada(s)`;
+    if (b.exclusoesBloqueadas) {
+      resumo += ` · ⚠ ${b.exclusoesBloqueadas} exclusões recusadas por segurança`;
+      toast(`Por segurança, ${b.exclusoesBloqueadas} exclusões vindas da nuvem foram recusadas. Suas mensagens continuam aqui.`, 'err');
+    }
+    syncStatus.textContent = resumo;
     await reloadMessages();
     toast('Sincronização concluída.', 'ok');
   };
