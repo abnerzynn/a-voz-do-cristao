@@ -1,5 +1,26 @@
 # A Voz do Cristão — Sistema de Projeção
 
+## ⬇️ Baixar e instalar
+
+### **[➡️ BAIXAR O APLICATIVO (Windows)](https://github.com/abnerzynn/a-voz-do-cristao/releases/latest)**
+
+1. Clique no link acima.
+2. Baixe o arquivo **`A-Voz-do-Cristao-Setup-x.x.x.exe`**.
+3. Dê dois cliques nele e siga a instalação.
+4. Abra o aplicativo — ele **já vem conectado** e baixa sozinho as mensagens da igreja.
+
+> **Se o Windows mostrar "O Windows protegeu o seu PC":** clique em
+> **Mais informações** → **Executar assim mesmo**. Isso acontece porque o
+> instalador não tem assinatura digital paga — não é vírus.
+
+> **Na primeira vez**, a sincronização baixa centenas de mensagens e pode levar
+> um ou dois minutos. Depois disso tudo fica no computador e funciona **sem internet**.
+
+Atualizações seguintes são **automáticas**: basta abrir o aplicativo.
+
+---
+
+
 Aplicativo **desktop para Windows** para organizar, buscar e projetar mensagens de
 William Marrion Branham. Funciona **offline**, projeta em outro monitor e transmite
 o texto pela **rede local** (inclusive uma saída transparente para o **OBS**).
@@ -9,6 +30,10 @@ uso durante o culto, no estilo do Holyrics, porém focado exclusivamente em mens
 
 ## Recursos
 
+- **Roteiro do culto**: monte a lista de leituras da pregação (cole a lista do Word e o
+  aplicativo localiza cada mensagem por título e data), e projete sem procurar nada.
+- **Sincronização na nuvem**: a mesma biblioteca e o mesmo roteiro em todos os
+  computadores da igreja, sem configurar nada.
 - **Cadastro de mensagens** com título, dia, mês (por extenso), ano e tradução
   (VGR, GO, AM, MH, MLE, VSA, CB).
 - **Separação automática de parágrafos** pela numeração (tudo entre o número 10 e o
