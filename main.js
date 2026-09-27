@@ -238,10 +238,31 @@ async function doSync() {
     const since = cfg.lastSyncAt || '';
     // 1) Traz o que mudou na nuvem e aplica aqui.
     const rows = await cloud.pull(cfg, since);
-    const aplicado = db.applyRemote(rows, db.getSettings().charLimit);
+
+    // O roteiro do culto viaja numa linha reservada, para chegar junto nos
+    // outros computadores sem precisar montar a lista de novo em cada um.
+    const linhaRoteiro = rows.find(r => r.id === cloud.ID_ROTEIRO);
+    const aplicado = db.applyRemote(
+      rows.filter(r => r.id !== cloud.ID_ROTEIRO), db.getSettings().charLimit);
+
+    if (linhaRoteiro && !linhaRoteiro.deleted) {
+      const local = db.getRoteiro();
+      if (!local.atualizadoEm || linhaRoteiro.updatedAt > local.atualizadoEm) {
+        try { db.saveRoteiro(JSON.parse(linhaRoteiro.originalText)); aplicado.roteiro = true; }
+        catch (_) { /* roteiro inválido: ignora */ }
+      }
+    }
+
     // 2) Envia o que mudou aqui.
     const { messages, tombstones } = db.getLocalChanges(since);
     const enviadas = await cloud.push(cfg, messages, tombstones);
+
+    // 3) Envia o roteiro, se o daqui for mais novo que o da nuvem.
+    const meuRoteiro = db.getRoteiro();
+    const roteiroDaNuvem = linhaRoteiro ? linhaRoteiro.updatedAt : '';
+    if (meuRoteiro.atualizadoEm && meuRoteiro.atualizadoEm > roteiroDaNuvem) {
+      await cloud.pushRoteiro(cfg, meuRoteiro);
+    }
     // 3) Guarda a data, com folga de 5 minutos para tolerar relógios diferentes.
     const marca = new Date(Date.now() - 5 * 60 * 1000).toISOString();
     db.setLastSync(marca);

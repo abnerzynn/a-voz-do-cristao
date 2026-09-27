@@ -153,4 +153,24 @@ async function push(cfg, messages, tombstones) {
   return rows.length;
 }
 
-module.exports = { configured, test, pull, push, TABLE };
+// O roteiro do culto viaja numa linha reservada da mesma tabela, para chegar
+// junto nos outros computadores sem precisar de alteração no banco.
+const ID_ROTEIRO = '__roteiro__';
+
+async function pushRoteiro(cfg, roteiro) {
+  const linha = {
+    id: ID_ROTEIRO,
+    workspace: cfg.workspace,
+    title: '__roteiro__',
+    original_text: JSON.stringify(roteiro || {}),
+    created_at: roteiro.atualizadoEm || new Date().toISOString(),
+    updated_at: roteiro.atualizadoEm || new Date().toISOString(),
+    deleted: false
+  };
+  await request(cfg, 'POST', `${TABLE}?on_conflict=id`, [linha], {
+    'Prefer': 'resolution=merge-duplicates,return=minimal'
+  });
+  return true;
+}
+
+module.exports = { configured, test, pull, push, pushRoteiro, TABLE, ID_ROTEIRO };
