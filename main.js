@@ -7,6 +7,12 @@ const server = require('./src/server');
 const cloud = require('./src/cloud');
 const { autoUpdater } = require('electron-updater');
 
+// Garante a MESMA pasta de dados no modo de desenvolvimento e no aplicativo
+// instalado. Sem isto, o Electron usa o nome do pacote em desenvolvimento e o
+// nome do produto depois de instalado — e a biblioteca de mensagens ficaria
+// dividida em duas pastas diferentes.
+app.setName('a-voz-do-cristao');
+
 let mainWindow = null;
 let projectionWindow = null;
 let lastState = null; // último estado de projeção enviado
