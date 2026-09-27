@@ -34,10 +34,52 @@ function parseParagraphs(raw) {
   // Normaliza quebras de linha, mantém o restante do conteúdo intacto.
   const lines = raw.replace(/\r\n?/g, '\n').split('\n');
 
+  // --- 1ª passagem: levanta todos os candidatos a número de parágrafo ---
+  const candidatos = [];
+  lines.forEach((line, i) => {
+    const inline = line.match(INLINE_MARKER);
+    const alone = line.match(ALONE_MARKER);
+    const m = inline || alone;
+    if (m) candidatos.push({ i, num: parseInt(m[1], 10), resto: inline ? m[2] : '' });
+  });
+
+  // --- 2ª passagem: aceita apenas os que formam a sequência real ---
+  // Um número só é marcador se a numeração continuar a partir dele. Assim,
+  // números soltos no início de linha (a data do cabeçalho, um versículo,
+  // um ano) não "sequestram" a contagem e não engolem os parágrafos seguintes.
+  const aceitos = [];
+  let lastNumber = null;
+  for (let k = 0; k < candidatos.length; k++) {
+    const c = candidatos[k];
+    const proximos = candidatos.slice(k + 1, k + 4);
+
+    if (lastNumber === null) {
+      // O primeiro marcador precisa iniciar uma sequência (ou ser o único).
+      if (candidatos.length === 1 || proximos.some(x => x.num === c.num + 1)) {
+        aceitos.push(c);
+        lastNumber = c.num;
+      }
+      continue;
+    }
+    if (c.num === lastNumber + 1) {
+      aceitos.push(c);
+      lastNumber = c.num;
+      continue;
+    }
+    // Salto verdadeiro na numeração: só vale se a sequência seguir depois dele.
+    if (c.num > lastNumber + 1 && c.num <= lastNumber + 20 &&
+        proximos.some(x => x.num === c.num + 1)) {
+      aceitos.push(c);
+      lastNumber = c.num;
+    }
+    // Caso contrário: número solto no meio do texto — ignora.
+  }
+  const marcadores = new Map(aceitos.map(c => [c.i, c]));
+
+  // --- 3ª passagem: monta os parágrafos ---
   const paragraphs = [];
   let current = null;      // parágrafo em construção
   let intro = [];          // texto antes do primeiro número
-  let lastNumber = null;
 
   const pushCurrent = () => {
     if (current) {
@@ -51,39 +93,27 @@ function parseParagraphs(raw) {
     current = null;
   };
 
-  for (const line of lines) {
-    const inline = line.match(INLINE_MARKER);
-    const alone = line.match(ALONE_MARKER);
-    const match = inline || alone;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const marcador = marcadores.get(i);
 
-    if (match) {
-      const num = parseInt(match[1], 10);
-      // Aceita como novo marcador se for o primeiro, ou se for
-      // estritamente maior que o último (numeração monotônica crescente).
-      // Isso evita tratar anos ("1963") ou referências no meio da frase
-      // como número de parágrafo — esses não iniciam a linha isolados.
-      const isMarker =
-        lastNumber === null ? true : num > lastNumber && num <= lastNumber + 50;
-
-      if (isMarker) {
-        pushCurrent();
-        if (intro.length && paragraphs.length === 0) {
-          const introText = intro.join('\n').trim();
-          if (introText) {
-            paragraphs.push({
-              number: null,
-              text: introText,
-              charCount: countChars(introText)
-            });
-            warnings.push('Há texto antes do primeiro parágrafo numerado (marcado como introdução).');
-          }
-          intro = [];
+    if (marcador) {
+      pushCurrent();
+      if (intro.length && paragraphs.length === 0) {
+        const introText = intro.join('\n').trim();
+        if (introText) {
+          paragraphs.push({
+            number: null,
+            text: introText,
+            charCount: countChars(introText)
+          });
+          warnings.push('Há texto antes do primeiro parágrafo numerado (marcado como introdução).');
         }
-        current = { number: num, lines: [] };
-        lastNumber = num;
-        if (inline && match[2]) current.lines.push(match[2]);
-        continue;
+        intro = [];
       }
+      current = { number: marcador.num, lines: [] };
+      if (marcador.resto) current.lines.push(marcador.resto);
+      continue;
     }
 
     // Linha comum: pertence ao parágrafo atual (ou à introdução).
