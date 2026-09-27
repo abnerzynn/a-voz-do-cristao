@@ -116,15 +116,32 @@ async function test(cfg) {
   return true;
 }
 
-/** Baixa as linhas alteradas na nuvem desde a data informada. */
-async function pull(cfg, sinceISO) {
-  const parts = [
-    'select=*',
-    'workspace=eq.' + encodeURIComponent(cfg.workspace)
-  ];
-  if (sinceISO) parts.push('updated_at=gt.' + encodeURIComponent(sinceISO));
-  const rows = await request(cfg, 'GET', `${TABLE}?${parts.join('&')}`);
-  return (Array.isArray(rows) ? rows : []).map(toLocal);
+/**
+ * Baixa as linhas alteradas na nuvem desde a data informada.
+ *
+ * A leitura é feita em páginas. Cada mensagem carrega o sermão inteiro, então
+ * pedir centenas de uma vez estoura o tempo limite do banco — era o que
+ * quebrava a primeira sincronização de um computador novo.
+ */
+async function pull(cfg, sinceISO, aoProgredir) {
+  const PAGINA = 25;
+  const todas = [];
+  for (let offset = 0; ; offset += PAGINA) {
+    const parts = [
+      'select=*',
+      'workspace=eq.' + encodeURIComponent(cfg.workspace),
+      'order=updated_at.asc,id.asc',
+      'limit=' + PAGINA,
+      'offset=' + offset
+    ];
+    if (sinceISO) parts.push('updated_at=gt.' + encodeURIComponent(sinceISO));
+    const rows = await request(cfg, 'GET', `${TABLE}?${parts.join('&')}`);
+    const lote = Array.isArray(rows) ? rows : [];
+    for (const r of lote) todas.push(toLocal(r));
+    if (typeof aoProgredir === 'function') aoProgredir(todas.length);
+    if (lote.length < PAGINA) break;
+  }
+  return todas;
 }
 
 /** Envia (insere ou atualiza) as mensagens informadas. */
