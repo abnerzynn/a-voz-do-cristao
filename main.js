@@ -127,6 +127,11 @@ function registerIpc() {
   ipcMain.handle('messages:rebuildAll', (_e, limit) => db.rebuildAll(limit));
   ipcMain.handle('messages:stats', () => db.stats());
 
+  // Roteiro do culto
+  ipcMain.handle('roteiro:get', () => db.getRoteiro());
+  ipcMain.handle('roteiro:montar', (_e, texto) => db.montarRoteiro(texto));
+  ipcMain.handle('roteiro:save', (_e, r) => db.saveRoteiro(r));
+
   // Busca
   ipcMain.handle('search:titleParagraph', (_e, title, num) => db.searchByTitleParagraph(title, num));
   ipcMain.handle('search:fullText', (_e, q, opts) => db.searchFullText(q, opts));

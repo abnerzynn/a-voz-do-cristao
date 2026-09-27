@@ -38,7 +38,8 @@ const DEFAULT_SETTINGS = {
 };
 
 let dataFile = null;
-let db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [] };
+const ROTEIRO_VAZIO = { tema: '', escritura: '', itens: [], atualizadoEm: '' };
+let db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [], roteiro: { ...ROTEIRO_VAZIO } };
 
 function uid() {
   return crypto.randomBytes(8).toString('hex');
@@ -51,7 +52,8 @@ function load() {
       db = {
         settings: { ...DEFAULT_SETTINGS, ...(parsed.settings || {}) },
         messages: Array.isArray(parsed.messages) ? parsed.messages : [],
-        deleted: Array.isArray(parsed.deleted) ? parsed.deleted : []
+        deleted: Array.isArray(parsed.deleted) ? parsed.deleted : [],
+        roteiro: { ...ROTEIRO_VAZIO, ...(parsed.roteiro || {}) }
       };
     }
   } catch (err) {
@@ -61,7 +63,7 @@ function load() {
         fs.copyFileSync(dataFile, dataFile + '.corrupted-' + Date.now());
       }
     } catch (_) { /* ignore */ }
-    db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [] };
+    db = { settings: { ...DEFAULT_SETTINGS }, messages: [], deleted: [], roteiro: { ...ROTEIRO_VAZIO } };
   }
 }
 
@@ -481,6 +483,64 @@ function applyRemote(rows, limit, opcoes) {
   };
 }
 
+// ---------- Roteiro do culto ----------
+const roteiroLib = require('./roteiro');
+
+function getRoteiro() {
+  return { ...ROTEIRO_VAZIO, ...(db.roteiro || {}) };
+}
+
+function saveRoteiro(r) {
+  db.roteiro = {
+    tema: (r && r.tema) || '',
+    escritura: (r && r.escritura) || '',
+    itens: (r && Array.isArray(r.itens)) ? r.itens : [],
+    atualizadoEm: new Date().toISOString()
+  };
+  save();
+  return getRoteiro();
+}
+
+/**
+ * Monta o roteiro a partir do texto colado (a lista preparada no Word).
+ * Cada parágrafo vira um item, já apontando para o slide certo.
+ */
+function montarRoteiro(texto) {
+  const { tema, escritura, referencias } = roteiroLib.parsearTexto(texto);
+  const resumo = db.messages.map(m => ({
+    id: m.id, title: m.title, year: m.year, month: m.month, day: m.day
+  }));
+
+  const itens = [];
+  for (const ref of referencias) {
+    const { mensagem, motivo } = roteiroLib.casarMensagem(ref, resumo);
+    const completa = mensagem ? db.messages.find(m => m.id === mensagem.id) : null;
+    const refData = [ref.dia, ref.mes, ref.ano].filter(v => v != null).join('/');
+
+    for (const numero of ref.paragrafos) {
+      const slideIndex = completa
+        ? (completa.slides || []).findIndex(s => s.paragraphNumber === numero)
+        : -1;
+      itens.push({
+        id: uid(),
+        messageId: completa ? completa.id : null,
+        titulo: completa ? completa.title : ref.titulo,
+        dateLabel: completa ? dateLabel(completa) : '',
+        translation: completa ? completa.translation : '',
+        paragrafo: numero,
+        slideIndex: slideIndex >= 0 ? slideIndex : null,
+        encontrada: !!completa && slideIndex >= 0,
+        motivo: !completa ? motivo
+              : (slideIndex < 0 ? `mensagem encontrada, mas sem o parágrafo ${numero}` : motivo),
+        refTitulo: ref.titulo,
+        refData
+      });
+    }
+  }
+
+  return saveRoteiro({ tema, escritura, itens });
+}
+
 module.exports = {
   init, MONTHS, TRANSLATIONS, DEFAULT_SETTINGS,
   getSettings, saveSettings,
@@ -488,5 +548,6 @@ module.exports = {
   duplicateMessage, rebuildAll, preview,
   searchByTitleParagraph, searchFullText,
   exportBackup, importBackup, wipeAll, stats, dateLabel,
-  getCloudConfig, setLastSync, getLocalChanges, applyRemote
+  getCloudConfig, setLastSync, getLocalChanges, applyRemote,
+  getRoteiro, saveRoteiro, montarRoteiro
 };

@@ -42,6 +42,11 @@ contextBridge.exposeInMainWorld('api', {
     import: () => ipcRenderer.invoke('backup:import'),
     wipe: () => ipcRenderer.invoke('backup:wipe')
   },
+  roteiro: {
+    get: () => ipcRenderer.invoke('roteiro:get'),
+    montar: (texto) => ipcRenderer.invoke('roteiro:montar', texto),
+    save: (r) => ipcRenderer.invoke('roteiro:save', r)
+  },
   cloud: {
     config: () => ipcRenderer.invoke('cloud:config'),
     test: (cfg) => ipcRenderer.invoke('cloud:test', cfg),

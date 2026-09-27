@@ -31,7 +31,10 @@ const S = {
   projectionOpen: false,
   // Projeção atual
   current: null,        // mensagem completa carregada
-  slideIndex: 0
+  slideIndex: 0,
+  // Roteiro do culto
+  roteiro: null,
+  itemAtual: -1
 };
 
 /* ---------- Utilidades ---------- */
@@ -87,8 +90,8 @@ function go(page) {
   $('#page-' + page).classList.remove('hidden');
   const render = {
     inicio: renderInicio, biblioteca: renderBiblioteca, nova: renderNova,
-    busca: renderBusca, projecao: renderProjecao, transmissao: renderTransmissao,
-    config: renderConfig
+    busca: renderBusca, culto: renderCulto, projecao: renderProjecao,
+    transmissao: renderTransmissao, config: renderConfig
   }[page];
   if (render) render();
 }
@@ -492,6 +495,145 @@ function renderTextSearch() {
 }
 
 /* ============================================================
+   4b. CULTO (roteiro da pregação)
+   ============================================================ */
+async function renderCulto() {
+  const r = S.roteiro || (S.roteiro = await window.api.roteiro.get());
+  const itens = r.itens || [];
+  const faltando = itens.filter(i => !i.encontrada).length;
+
+  $('#page-culto').innerHTML = `
+    <div class="page-head">
+      <h1 class="page-title">Culto
+        <small>${itens.length ? `${itens.length} leitura(s) no roteiro${faltando ? ` · ${faltando} para resolver` : ''}` : 'Monte a lista do que será lido na pregação'}</small></h1>
+      ${itens.length ? '<button class="btn btn-danger" id="cuLimpar">Limpar roteiro</button>' : ''}
+    </div>
+
+    <div class="card" style="margin-bottom:18px">
+      <div style="font-weight:600;margin-bottom:6px">Colar a lista do Word</div>
+      <div class="muted" style="font-size:12.5px;margin-bottom:10px">
+        Cole o texto com as referências e os parágrafos. O aplicativo localiza cada mensagem
+        pelo título <b>e pela data</b>, e já deixa tudo apontando para o slide certo.
+      </div>
+      <textarea class="input" id="cuTexto" style="width:100%;min-height:120px;resize:vertical"
+        placeholder="Tema: ...&#10;Escritura: ...&#10;&#10;A JUNÇÃO DO TEMPO 1956.01.15&#10;12 ...&#10;13 ...&#10;&#10;64-0313 — A Voz do Sinal&#10;53 ..."></textarea>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-primary" id="cuMontar">📋 Montar roteiro</button>
+        <span class="muted" id="cuAviso" style="font-size:12.5px"></span>
+      </div>
+    </div>
+
+    ${itens.length ? `
+      <div class="card" style="margin-bottom:16px">
+        <div class="field"><label>Tema</label><input class="input" id="cuTema" value="${esc(r.tema||'')}"></div>
+        <div class="field" style="margin-top:10px"><label>Escritura</label><input class="input" id="cuEscritura" value="${esc(r.escritura||'')}"></div>
+      </div>
+      <div class="culto-lista" id="cuLista"></div>` : ''}
+  `;
+
+  $('#cuMontar').onclick = async () => {
+    const texto = $('#cuTexto').value;
+    if (!texto.trim()) { toast('Cole a lista antes de montar.', 'err'); return; }
+    if (itens.length) {
+      const ok = await confirmModal('Substituir roteiro',
+        'Já existe um roteiro montado. Deseja substituí-lo pelo texto colado?', 'Substituir', true);
+      if (!ok) return;
+    }
+    $('#cuAviso').textContent = 'Montando…';
+    S.roteiro = await window.api.roteiro.montar(texto);
+    S.itemAtual = -1;
+    const n = S.roteiro.itens.length, f = S.roteiro.itens.filter(i => !i.encontrada).length;
+    toast(`Roteiro montado: ${n - f} pronto(s)${f ? `, ${f} para resolver` : ''}.`, f ? 'err' : 'ok');
+    renderCulto();
+  };
+
+  const limpar = $('#cuLimpar');
+  if (limpar) limpar.onclick = async () => {
+    const ok = await confirmModal('Limpar roteiro', 'Remover todas as leituras do roteiro?', 'Limpar', true);
+    if (!ok) return;
+    S.roteiro = await window.api.roteiro.save({ tema: '', escritura: '', itens: [] });
+    S.itemAtual = -1;
+    renderCulto();
+  };
+
+  const tema = $('#cuTema'), escritura = $('#cuEscritura');
+  const salvarCabecalho = async () => {
+    S.roteiro = await window.api.roteiro.save({
+      tema: tema.value, escritura: escritura.value, itens: S.roteiro.itens
+    });
+  };
+  if (tema) tema.onchange = salvarCabecalho;
+  if (escritura) escritura.onchange = salvarCabecalho;
+
+  desenharListaCulto();
+}
+
+function desenharListaCulto() {
+  const box = $('#cuLista');
+  if (!box) return;
+  const itens = S.roteiro.itens || [];
+  box.innerHTML = itens.map((it, i) => `
+    <div class="culto-item ${i === S.itemAtual ? 'atual' : ''} ${it.encontrada ? '' : 'faltando'}" data-i="${i}">
+      <div class="ci-ord">${i + 1}</div>
+      <div class="ci-main">
+        <div class="ci-tit">${esc(it.titulo)} <span class="badge tr">§ ${it.paragrafo}</span></div>
+        <div class="ci-sub">
+          ${esc(it.dateLabel || it.refData || '')}${it.translation ? ' · ' + esc(it.translation) : ''}
+          ${it.encontrada ? '' : `<span class="ci-erro">⚠ ${esc(it.motivo)}</span>`}
+        </div>
+      </div>
+      <div class="ci-acoes">
+        <button class="icon-btn" data-act="up" title="Subir">▲</button>
+        <button class="icon-btn" data-act="down" title="Descer">▼</button>
+        <button class="icon-btn" data-act="del" title="Remover">🗑️</button>
+      </div>
+    </div>`).join('');
+
+  $$('.culto-item', box).forEach(el => {
+    const i = parseInt(el.dataset.i, 10);
+    el.querySelector('.ci-main').onclick = () => abrirItemDoCulto(i);
+    el.querySelector('.ci-ord').onclick = () => abrirItemDoCulto(i);
+    el.querySelector('[data-act="up"]').onclick = (e) => { e.stopPropagation(); moverItem(i, -1); };
+    el.querySelector('[data-act="down"]').onclick = (e) => { e.stopPropagation(); moverItem(i, 1); };
+    el.querySelector('[data-act="del"]').onclick = async (e) => {
+      e.stopPropagation();
+      S.roteiro.itens.splice(i, 1);
+      S.roteiro = await window.api.roteiro.save(S.roteiro);
+      if (S.itemAtual >= S.roteiro.itens.length) S.itemAtual = S.roteiro.itens.length - 1;
+      renderCulto();
+    };
+  });
+}
+
+async function moverItem(i, dir) {
+  const itens = S.roteiro.itens;
+  const j = i + dir;
+  if (j < 0 || j >= itens.length) return;
+  [itens[i], itens[j]] = [itens[j], itens[i]];
+  S.roteiro = await window.api.roteiro.save(S.roteiro);
+  if (S.itemAtual === i) S.itemAtual = j; else if (S.itemAtual === j) S.itemAtual = i;
+  renderCulto();
+}
+
+/** Abre a leitura do roteiro direto na projeção, no slide do parágrafo. */
+async function abrirItemDoCulto(i) {
+  const it = (S.roteiro.itens || [])[i];
+  if (!it) return;
+  if (!it.encontrada) { toast('Esta leitura não foi localizada: ' + it.motivo, 'err'); return; }
+  S.itemAtual = i;
+  await openInProjection(it.messageId, it.slideIndex || 0);
+}
+
+function irParaItem(dir) {
+  const itens = (S.roteiro && S.roteiro.itens) || [];
+  if (!itens.length) return;
+  let i = S.itemAtual;
+  do { i += dir; } while (i >= 0 && i < itens.length && !itens[i].encontrada);
+  if (i < 0 || i >= itens.length) { toast(dir > 0 ? 'Última leitura do roteiro.' : 'Primeira leitura do roteiro.'); return; }
+  abrirItemDoCulto(i);
+}
+
+/* ============================================================
    5. PROJEÇÃO
    ============================================================ */
 async function openInProjection(id, slideIndex = 0) {
@@ -574,6 +716,19 @@ function renderProjecao() {
   const previewMeta = Math.round((st.metaFontSize || 22) * scale);
   const op = st.textOpacity == null ? 1 : st.textOpacity;
 
+  // Faixa do roteiro: mostra em que leitura do culto estamos.
+  const rot = (S.roteiro && S.roteiro.itens) || [];
+  const noRoteiro = rot.length > 0 && S.itemAtual >= 0 && rot[S.itemAtual];
+  const faixaRoteiro = noRoteiro ? `
+    <div class="roteiro-strip">
+      <span class="rs-pos">Culto · leitura ${S.itemAtual + 1} de ${rot.length}</span>
+      <span class="muted">${esc(rot[S.itemAtual].titulo)} — § ${rot[S.itemAtual].paragrafo}</span>
+      <span class="spacer"></span>
+      <button class="btn btn-sm" id="rsPrev">◀ anterior</button>
+      <button class="btn btn-sm btn-primary" id="rsNext">próxima leitura ▶</button>
+      <button class="btn btn-sm" id="rsLista">ver roteiro</button>
+    </div>` : '';
+
   page.innerHTML = `
     <div class="page-head">
       <div>
@@ -586,6 +741,8 @@ function renderProjecao() {
         <button class="btn btn-danger" id="pcClose">Fechar janela</button>
       </div>
     </div>
+
+    ${faixaRoteiro}
 
     <div class="proj-layout">
       <div class="slide-list" id="slideList"></div>
@@ -627,6 +784,12 @@ function renderProjecao() {
 
   // A prévia também mostra o auto-ajuste (fonte enche a caixa).
   requestAnimationFrame(fitProjPreview);
+
+  if (noRoteiro) {
+    $('#rsPrev').onclick = () => irParaItem(-1);
+    $('#rsNext').onclick = () => irParaItem(1);
+    $('#rsLista').onclick = () => go('culto');
+  }
 
   $('#pFirst').onclick = () => setSlide(0);
   $('#pPrev').onclick = () => setSlide(S.slideIndex - 1);
@@ -1085,6 +1248,7 @@ window.api.server.onClients((n) => {
   S.settings = await window.api.settings.get();
   applyTheme();
   await reloadMessages();
+  S.roteiro = await window.api.roteiro.get();
   const st = await window.api.server.status();
   S.serverStatus = st;
   S.projectionOpen = await window.api.projection.isOpen();
