@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Voz do Cristão — Sistema de Projeção</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="dark">
+  <div id="app">
+    <!-- Barra superior -->
+    <header class="topbar">
+      <div class="brand">
+        <img class="brand-logo" src="../assets/logo.png" alt="A Voz do Cristão"
+             onerror="this.onerror=null;this.src='../assets/logo.svg'">
+        <div class="brand-text">
+          <div class="brand-title">A Voz do Cristão</div>
+          <div class="brand-sub">Sistema de Projeção</div>
+        </div>
+      </div>
+      <nav class="menu">
+        <button class="nav-item active" data-page="inicio"><span class="ico">🏠</span><span class="lbl">Início</span></button>
+        <button class="nav-item" data-page="biblioteca"><span class="ico">📚</span><span class="lbl">Biblioteca</span></button>
+        <button class="nav-item" data-page="nova"><span class="ico">✚</span><span class="lbl">Nova Mensagem</span></button>
+        <button class="nav-item" data-page="busca"><span class="ico">🔎</span><span class="lbl">Busca</span></button>
+        <button class="nav-item" data-page="projecao"><span class="ico">📽️</span><span class="lbl">Projeção</span></button>
+        <button class="nav-item" data-page="transmissao"><span class="ico">📡</span><span class="lbl">Transmissão</span></button>
+        <button class="nav-item" data-page="config"><span class="ico">⚙️</span><span class="lbl">Configurações</span></button>
+      </nav>
+      <div class="topbar-right">
+        <span id="dotServer" class="status-pill" title="Transmissão"><span class="d"></span>Transmissão</span>
+        <span id="dotProj" class="status-pill" title="Projeção"><span class="d"></span>Projeção</span>
+        <button id="themeToggle" class="theme-btn" title="Alternar tema claro/escuro">☀️</button>
+      </div>
+    </header>
+
+    <!-- Conteúdo -->
+    <main class="content">
+      <section class="page" id="page-inicio"></section>
+      <section class="page hidden" id="page-biblioteca"></section>
+      <section class="page hidden" id="page-nova"></section>
+      <section class="page hidden" id="page-busca"></section>
+      <section class="page hidden" id="page-projecao"></section>
+      <section class="page hidden" id="page-transmissao"></section>
+      <section class="page hidden" id="page-config"></section>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Modal de confirmação -->
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div id="modalTitle" class="modal-title"></div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn btn-ghost">Cancelar</button>
+        <button id="modalOk" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

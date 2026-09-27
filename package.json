@@ -1,0 +1,65 @@
+{
+  "name": "a-voz-do-cristao",
+  "version": "1.0.1",
+  "description": "Sistema de Projeção — organização, busca e projeção de mensagens de William Marrion Branham",
+  "main": "main.js",
+  "author": "A Voz do Cristão",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.avozdocristao.projecao",
+    "productName": "A Voz do Cristao",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "web/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "icon": "assets/logo.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "A-Voz-do-Cristao-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "A Voz do Cristao"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "abnerzynn",
+        "repo": "a-voz-do-cristao"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abnerzynn/a-voz-do-cristao.git"
+  }
+}

@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Projeção — A Voz do Cristão</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: none; }
+  /* O viewport preenche a janela e centraliza o palco (canvas). */
+  #viewport {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; background: #000;
+  }
+  /* Palco de tamanho fixo 1920x1080 — nunca passa disso. É escalado para caber na tela. */
+  #canvas {
+    width: 1920px; height: 1080px; flex-shrink: 0;
+    box-sizing: border-box; padding: 60px 110px;
+    display: flex; align-items: center; justify-content: center;
+    transform-origin: center center;
+  }
+  #block {
+    max-width: 1700px; text-align: center; display: flex; flex-direction: column;
+    align-items: center; gap: 34px; transform-origin: center center;
+  }
+  #para { font-family: system-ui, Arial, sans-serif; font-weight: 600; }
+  #text { line-height: 1.32; white-space: pre-wrap; word-break: break-word; }
+  #meta { font-family: system-ui, Arial, sans-serif; }
+  .hidden { display: none !important; }
+  #idle { color: #555; font-family: system-ui, Arial, sans-serif; font-size: 40px; }
+</style>
+</head>
+<body>
+  <div id="viewport">
+    <div id="canvas">
+      <div id="block">
+        <div id="para" class="hidden"></div>
+        <div id="text"></div>
+        <div id="meta" class="hidden"></div>
+        <div id="idle">A Voz do Cristão — aguardando projeção…</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const viewport = document.getElementById('viewport');
+    const canvas = document.getElementById('canvas');
+    const block = document.getElementById('block');
+    const textEl = document.getElementById('text');
+    const paraEl = document.getElementById('para');
+    const metaEl = document.getElementById('meta');
+    const idleEl = document.getElementById('idle');
+
+    const CANVAS_W = 1920, CANVAS_H = 1080, PAD_X = 110, PAD_Y = 60;
+
+    // Escala o canvas 1920x1080 para caber na janela (mantém proporção, nunca corta).
+    function fitCanvas() {
+      const scale = Math.min(window.innerWidth / CANVAS_W, window.innerHeight / CANVAS_H);
+      canvas.style.transform = 'scale(' + scale + ')';
+    }
+
+    let cur = null; // último estado recebido
+
+    // Auto-ajuste: escolhe a MAIOR fonte que cabe na tela (aumenta frases curtas,
+    // reduz parágrafos cheios). Busca binária medindo o texto real.
+    function fitText(availW, availH, maxPx) {
+      let lo = 20, hi = maxPx, best = lo;
+      for (let i = 0; i < 14; i++) {
+        const mid = (lo + hi) / 2;
+        textEl.style.fontSize = mid + 'px';
+        if (block.scrollWidth <= availW && block.scrollHeight <= availH) { best = mid; lo = mid; }
+        else { hi = mid; }
+      }
+      textEl.style.fontSize = best + 'px';
+    }
+
+    // Segurança: se ainda passar da área útil, encolhe o bloco inteiro.
+    function fitBlock(availW, availH) {
+      block.style.transform = 'scale(1)';
+      const w = block.scrollWidth, h = block.scrollHeight;
+      let f = 1;
+      if (w > availW) f = Math.min(f, availW / w);
+      if (h > availH) f = Math.min(f, availH / h);
+      if (f < 1) block.style.transform = 'scale(' + f + ')';
+    }
+
+    function applyFit() {
+      if (!cur || !cur.active || !cur.text) { block.style.transform = 'scale(1)'; return; }
+      const availW = CANVAS_W - PAD_X * 2, availH = CANVAS_H - PAD_Y * 2;
+      block.style.transform = 'scale(1)';
+      if (cur.autoFit !== false) fitText(availW, availH, cur.autoFitMax || 240);
+      else textEl.style.fontSize = (cur.fontSize || 48) + 'px';
+      fitBlock(availW, availH);
+    }
+
+    function render(s) {
+      cur = s;
+      if (!s || !s.active || !s.text) {
+        idleEl.classList.remove('hidden');
+        textEl.textContent = '';
+        paraEl.classList.add('hidden');
+        metaEl.classList.add('hidden');
+        viewport.style.background = (s && s.background) || '#000';
+        block.style.transform = 'scale(1)';
+        return;
+      }
+      idleEl.classList.add('hidden');
+      const op = s.textOpacity == null ? 1 : s.textOpacity;
+
+      viewport.style.background = s.background || '#000';
+
+      // Texto da mensagem: SEMPRE 100% de opacidade, na fonte escolhida.
+      textEl.style.color = s.textColor || '#fff';
+      textEl.style.opacity = 1;
+      textEl.style.fontFamily = s.fontFamily || "Georgia, 'Times New Roman', serif";
+      textEl.style.fontSize = (s.fontSize || 48) + 'px';
+      textEl.textContent = s.text || '';
+
+      // Número do parágrafo: opacidade ajustável.
+      paraEl.style.color = s.textColor || '#fff';
+      paraEl.style.opacity = op;
+      paraEl.style.fontSize = (s.paragraphFontSize || 26) + 'px';
+      if (s.showParagraphNumber && s.paragraphNumber != null) {
+        paraEl.textContent = 'Parágrafo ' + s.paragraphNumber;
+        paraEl.classList.remove('hidden');
+      } else {
+        paraEl.classList.add('hidden');
+      }
+
+      // Título e data: opacidade ajustável.
+      metaEl.style.color = s.textColor || '#fff';
+      metaEl.style.opacity = op;
+      metaEl.style.fontSize = (s.metaFontSize || 22) + 'px';
+      const meta = [];
+      if (s.title) meta.push(s.title);
+      if (s.dateLabel) meta.push(s.dateLabel);
+      if (s.showTitleDate && meta.length) {
+        metaEl.textContent = meta.join(' — ');
+        metaEl.classList.remove('hidden');
+      } else {
+        metaEl.classList.add('hidden');
+      }
+
+      // Ajusta o encaixe após o layout atualizar.
+      requestAnimationFrame(applyFit);
+    }
+
+    window.addEventListener('resize', () => { fitCanvas(); applyFit(); });
+    fitCanvas();
+    window.api.projection.onState(render);
+  </script>
+</body>
+</html>

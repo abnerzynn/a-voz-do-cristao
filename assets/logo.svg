@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="w" x1="20" y1="8" x2="108" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd89b"/>
+      <stop offset="0.5" stop-color="#f5a623"/>
+      <stop offset="1" stop-color="#df7d18"/>
+    </linearGradient>
+    <linearGradient id="wl" x1="30" y1="10" x2="100" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe6bf"/>
+      <stop offset="1" stop-color="#f6b243"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Coração (fita dupla) -->
+  <path d="M64 116 C 33 94 27 68 46 61 C 56 57.2 62 64 64 72 C 66 64 72 57.2 82 61 C 101 68 95 94 64 116 Z"
+        fill="none" stroke="url(#w)" stroke-width="7.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M64 106 C 44 91 40 73 51 68 C 58 64.8 62 69 64 74 C 66 69 70 64.8 77 68 C 88 73 84 91 64 106 Z"
+        fill="none" stroke="url(#wl)" stroke-width="3.4" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Talos -->
+  <path d="M64 78 Q 55 60 53 46" fill="none" stroke="url(#w)" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M64 78 Q 73 58 75 44" fill="none" stroke="url(#w)" stroke-width="3.4" stroke-linecap="round"/>
+
+  <!-- Espiga esquerda -->
+  <g fill="url(#w)" stroke="#c96e14" stroke-width="0.7">
+    <ellipse cx="49" cy="13" rx="3.4" ry="8"  transform="rotate(-8 49 13)"/>
+    <ellipse cx="45" cy="21" rx="3.3" ry="7.6" transform="rotate(-40 45 21)"/>
+    <ellipse cx="55" cy="20" rx="3.3" ry="7.6" transform="rotate(22 55 20)"/>
+    <ellipse cx="47" cy="29" rx="3.3" ry="7.6" transform="rotate(-40 47 29)"/>
+    <ellipse cx="57" cy="28" rx="3.3" ry="7.6" transform="rotate(22 57 28)"/>
+    <ellipse cx="49" cy="37" rx="3.2" ry="7.2" transform="rotate(-40 49 37)"/>
+    <ellipse cx="59" cy="36" rx="3.2" ry="7.2" transform="rotate(22 59 36)"/>
+  </g>
+
+  <!-- Espiga direita -->
+  <g fill="url(#w)" stroke="#c96e14" stroke-width="0.7">
+    <ellipse cx="79" cy="11" rx="3.4" ry="8"  transform="rotate(8 79 11)"/>
+    <ellipse cx="72" cy="19" rx="3.3" ry="7.6" transform="rotate(-22 72 19)"/>
+    <ellipse cx="83" cy="19" rx="3.3" ry="7.6" transform="rotate(40 83 19)"/>
+    <ellipse cx="74" cy="27" rx="3.3" ry="7.6" transform="rotate(-22 74 27)"/>
+    <ellipse cx="85" cy="27" rx="3.3" ry="7.6" transform="rotate(40 85 27)"/>
+    <ellipse cx="76" cy="35" rx="3.2" ry="7.2" transform="rotate(-22 76 35)"/>
+    <ellipse cx="87" cy="35" rx="3.2" ry="7.2" transform="rotate(40 87 35)"/>
+  </g>
+</svg>
