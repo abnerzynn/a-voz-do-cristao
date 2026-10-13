@@ -216,6 +216,17 @@ select { cursor: pointer; }
 .snippet { font-size: 14px; line-height: 1.5; font-family: Georgia, serif; }
 .snippet mark { background: rgba(230,144,43,.35); color: var(--branco); padding: 0 2px; border-radius: 3px; }
 
+/* ===== Status da nuvem ===== */
+.nuvem-status {
+  display: flex; align-items: flex-start; gap: 11px; padding: 12px 14px;
+  border-radius: 10px; margin-bottom: 6px; font-size: 13.5px; line-height: 1.35;
+}
+.nuvem-status.ok { background: rgba(63,174,107,.10); border: 1px solid rgba(63,174,107,.40); }
+.nuvem-status.off { background: rgba(192,69,59,.10); border: 1px solid rgba(192,69,59,.40); }
+.nuvem-status .ns-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.nuvem-status.ok .ns-dot { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+.nuvem-status.off .ns-dot { background: var(--vermelho); }
+
 /* ===== Culto (roteiro) ===== */
 .culto-lista { display: flex; flex-direction: column; gap: 8px; }
 .culto-item {

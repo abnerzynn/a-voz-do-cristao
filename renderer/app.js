@@ -912,8 +912,10 @@ async function renderTransmissao() {
 /* ============================================================
    7. CONFIGURAÇÕES
    ============================================================ */
-function renderConfig() {
+async function renderConfig() {
   const s = S.settings;
+  // Configuração que está REALMENTE em uso (a digitada ou a embutida no app).
+  const nuvem = await window.api.cloud.config();
   $('#page-config').innerHTML = `
     <div class="page-head"><h1 class="page-title">Configurações <small>As alterações ficam salvas ao fechar o aplicativo</small></h1></div>
     <div class="config-grid">
@@ -1019,22 +1021,42 @@ function renderConfig() {
           Compartilha a mesma biblioteca de mensagens entre vários computadores.
           O aplicativo continua funcionando normalmente sem internet.
         </div>
+        <div class="nuvem-status ${nuvem.url ? 'ok' : 'off'}">
+          ${nuvem.url
+            ? `<span class="ns-dot"></span><div>
+                 <b>${nuvem.embutido ? 'Conectado automaticamente' : 'Conectado com a sua configuração'}</b>
+                 <div class="muted" style="font-size:12px;margin-top:2px">
+                   ${nuvem.embutido
+                     ? 'O aplicativo já vem com a configuração da igreja — não é preciso preencher nada.'
+                     : 'Usando o endereço e a chave digitados abaixo.'}
+                   ${nuvem.lastSyncAt ? ' Última sincronização: ' + esc(new Date(nuvem.lastSyncAt).toLocaleString('pt-BR')) + '.' : ''}
+                 </div>
+               </div>`
+            : `<span class="ns-dot"></span><div><b>Não configurado</b>
+                 <div class="muted" style="font-size:12px;margin-top:2px">Preencha os campos abaixo para sincronizar.</div></div>`}
+        </div>
         <div class="config-row">
           <div class="cl">Ativar sincronização<small>Sincroniza ao abrir o aplicativo</small></div>
           <label class="switch"><input type="checkbox" id="cSyncOn" ${s.cloudEnabled?'checked':''}><span class="track"></span></label>
         </div>
-        <div class="field" style="margin-top:10px">
-          <label>Endereço do projeto (URL)</label>
-          <input class="input" id="cSyncUrl" placeholder="https://xxxxxxxx.supabase.co" value="${esc(s.cloudUrl||'')}">
-        </div>
-        <div class="field" style="margin-top:10px">
-          <label>Chave pública (anon key)</label>
-          <input class="input" id="cSyncKey" type="password" placeholder="cole aqui a chave anon/public" value="${esc(s.cloudKey||'')}">
-        </div>
-        <div class="field" style="margin-top:10px">
-          <label>Chave da igreja<small style="color:var(--cinza-txt)"> — a mesma em todos os computadores</small></label>
-          <input class="input" id="cSyncWs" placeholder="ex.: tabernaculo-a-voz-do-cristao" value="${esc(s.cloudWorkspace||'')}">
-        </div>
+        <details style="margin-top:12px">
+          <summary class="muted" style="cursor:pointer;font-size:13px">Usar outro banco de dados (avançado)</summary>
+          <div class="muted" style="font-size:12px;margin:8px 0 4px">
+            Deixe em branco para manter a configuração embutida. Só preencha se quiser apontar para outro projeto.
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Endereço do projeto (URL)</label>
+            <input class="input" id="cSyncUrl" placeholder="${esc(nuvem.embutido && nuvem.url ? 'usando: ' + nuvem.url : 'https://xxxxxxxx.supabase.co')}" value="${esc(s.cloudUrl||'')}">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Chave pública (anon key)</label>
+            <input class="input" id="cSyncKey" type="password" placeholder="${nuvem.embutido && nuvem.key ? 'usando a chave embutida' : 'cole aqui a chave anon/public'}" value="${esc(s.cloudKey||'')}">
+          </div>
+          <div class="field" style="margin-top:10px">
+            <label>Chave da igreja<small style="color:var(--cinza-txt)"> — a mesma em todos os computadores</small></label>
+            <input class="input" id="cSyncWs" placeholder="${esc(nuvem.embutido && nuvem.workspace ? 'usando: ' + nuvem.workspace : 'ex.: tabernaculo-a-voz-do-cristao')}" value="${esc(s.cloudWorkspace||'')}">
+          </div>
+        </details>
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center">
           <button class="btn" id="cSyncTest">🔌 Testar conexão</button>
           <button class="btn btn-primary" id="cSyncNow">🔄 Sincronizar agora</button>
@@ -1170,14 +1192,18 @@ function renderConfig() {
   // ----- Sincronização na nuvem -----
   const syncStatus = $('#cSyncStatus');
   const semBarraFinal = (u) => { while (u.endsWith('/')) u = u.slice(0, -1); return u; };
+  // Campo em branco significa "use o que está embutido no aplicativo".
   const cloudCfg = () => ({
-    url: semBarraFinal($('#cSyncUrl').value.trim()),
-    key: $('#cSyncKey').value.trim(),
-    workspace: $('#cSyncWs').value.trim()
+    url: semBarraFinal($('#cSyncUrl').value.trim()) || nuvem.url,
+    key: $('#cSyncKey').value.trim() || nuvem.key,
+    workspace: $('#cSyncWs').value.trim() || nuvem.workspace
   });
   const salvarCloud = () => {
-    const c = cloudCfg();
-    commit({ cloudUrl: c.url, cloudKey: c.key, cloudWorkspace: c.workspace });
+    commit({
+      cloudUrl: semBarraFinal($('#cSyncUrl').value.trim()),
+      cloudKey: $('#cSyncKey').value.trim(),
+      cloudWorkspace: $('#cSyncWs').value.trim()
+    });
   };
   $('#cSyncUrl').onchange = salvarCloud;
   $('#cSyncKey').onchange = salvarCloud;
@@ -1205,6 +1231,7 @@ function renderConfig() {
     }
     syncStatus.textContent = resumo;
     await reloadMessages();
+    S.roteiro = await window.api.roteiro.get();
     toast('Sincronização concluída.', 'ok');
   };
 

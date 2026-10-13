@@ -67,6 +67,20 @@ function request(cfg, method, pathAndQuery, body, extraHeaders) {
       });
     });
     req.on('error', (err) => {
+      // ENOTFOUND no endereço do projeto costuma significar que ele foi
+      // pausado pelo provedor (o plano gratuito pausa após alguns dias sem
+      // uso). Vale avisar em português claro, e lembrar que nada se perdeu.
+      if (err.code === 'ENOTFOUND') {
+        reject(new Error(
+          'O banco de dados na nuvem não respondeu — ele costuma ser pausado após alguns ' +
+          'dias sem uso. Entre em supabase.com, abra o projeto e clique em "Restore". ' +
+          'Suas mensagens continuam salvas neste computador.'));
+        return;
+      }
+      if (err.code === 'ENETUNREACH' || err.code === 'EAI_AGAIN') {
+        reject(new Error('Sem internet no momento. O aplicativo continua funcionando normalmente com as mensagens deste computador.'));
+        return;
+      }
       reject(new Error('Sem conexão com a nuvem: ' + (err.code || err.message)));
     });
     req.setTimeout(20000, () => { req.destroy(new Error('Tempo esgotado.')); });
