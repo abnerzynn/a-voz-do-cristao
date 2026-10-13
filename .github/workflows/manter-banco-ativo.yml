@@ -1,0 +1,34 @@
+# Mantém o banco de dados da igreja sempre ativo.
+#
+# O plano gratuito do Supabase pausa projetos após alguns dias sem acesso.
+# Esta rotina toca no banco uma vez por dia, de graça, e evita a pausa.
+name: Manter o banco ativo
+
+on:
+  schedule:
+    - cron: '0 12 * * *'   # todo dia, 12:00 UTC (09:00 no horário de Brasília)
+  workflow_dispatch:       # permite rodar na mão pelo site do GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar o banco
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "::error::Faltam os segredos SUPABASE_URL e SUPABASE_KEY no repositório."
+            exit 1
+          fi
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/mensagens?select=id&limit=1")
+          echo "O banco respondeu: $codigo"
+          if [ "$codigo" != "200" ]; then
+            echo "::error::Esperava 200 e veio $codigo. O banco pode estar pausado."
+            exit 1
+          fi
+          echo "Banco ativo. Pausa evitada."
